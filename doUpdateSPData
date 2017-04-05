@@ -1,0 +1,23 @@
+#!/bin/bash
+
+####    get the last 10 days of SP data     ####
+
+    ./getSPDataYahoo.py `date -v-10d '+%Y-%m-%d'` `date '+%Y-%m-%d'` tsSPnew.csv
+
+
+####     backup the previous SP data file     ####
+
+    DATE=`date '+%Y-%m-%d'`
+    echo $DATE
+    echo "... backup sp500.csv to ./stock_data/sp500backup_$DATE.csv"
+    cp sp500.csv ./stock_data/sp500backup_$DATE.csv
+
+
+#### concatenate the old and new (incremental) sp500 data files ####
+
+    tmpFile="sp500$$.csv"
+    cp sp500.csv tmpFile
+    ./appendTSFiles.py tmpFile tsSPnew.csv sp500.csv
+    echo "new output filename:  sp500.csv"
+    rm tmpFile
+

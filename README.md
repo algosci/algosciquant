@@ -1,20 +1,19 @@
 # Files Overview
 
-* getStockData.md
- * get Stock Data from Yahoo
- 
-* StockData.ipynb
- * Stock plots
- 
-* ExampleStocks.ipynb (examples)
- * Pandas Rolling Apply
- * plots
+README.md
+index.md
 
-* getSP500.py
- * get S&P 500 data from Quandl
- * from 1920
- * output to data.csv (consumed by BearsBullsNotebook.py)
+algosciquant.py
+appendTSFiles.py
  
-* BearsBullsNotebook.ipynb
- * sadfasd;lf 
- * Bears Bull Algorithm applied to data.csv (S&P 500)
+doStockPred					
+doUpdateSPData
+doUpdateStockDataIntrinio
+
+getSP500QDL.py
+getSP500Yahoo.py
+getSPDataIntrino.py
+getSPDataYahoo.py
+getStockDataIntrino.py	
+getStockDataYahoo.py
+

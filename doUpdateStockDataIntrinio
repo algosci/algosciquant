@@ -1,0 +1,37 @@
+#!/bin/bash
+
+
+IFS=","
+tickerlist="AAPL,MCD,PNRA,AMZN,SBUX,GOOG,PNRA,LGF,IDXX,ADBE,DHR,BRK.B"
+
+
+for t in $tickerlist
+ do
+ echo "stock_$t.csv"
+
+
+####    get the last 10 days of data     ####
+
+    echo "./getStockDataIntrinio.py $t `date -v-10d '+%Y-%m-%d'` `date '+%Y-%m-%d'` ts_stock_new.csv"
+   ./getStockDataIntrino.py $t `date -v-10d '+%Y-%m-%d'` `date '+%Y-%m-%d'` ts_stock_new.csv
+
+
+####     backup the previous SP data file     ####
+
+    DATE=`date '+%Y-%m-%d'`
+    echo $DATE
+    echo "... backup stock_$t.csv to ./stock_data/stock_$t_$DATE.csv"
+    cp stock_$t.csv ./stock_data/stock_$t_$DATE.csv
+
+
+#### concatenate the old and new (incremental) sp500 data files ####
+
+    tmpFile="stock_$t_$$.csv"
+    cp stock_$t.csv tmpFile
+    ./appendTSFiles.py tmpFile ts_stock_new.csv stock_$t.csv
+    echo "new output filename:  stock_$t.csv"
+    rm tmpFile
+
+
+
+ done
