@@ -1,7 +1,7 @@
 # Files Overview
 
 
-## Algo Sci ndex.md file
+## Algo Sci index.md file
 index.md  
   
    

@@ -211,7 +211,7 @@ def tradeReturns(df,ticker):
     return  df
 
 
-# Hold or Sit trading strategy
+# Strategy Trade
 #  Inputs
 #     DataFrame
 #        ticker := price column
@@ -491,3 +491,490 @@ def mClfTrainTest(X, Y, train_st, test_st, test_et, clf, trainndays = -1,mc=0,df
     dfTR['p']= dfTR['p_np1'].shift(1)
     print ("Training month", i.strftime('%Y-%m-%d'), "train_st = ",train_st, 'train_st2 = ',train_st2)
     return dfTR, clf
+
+from sklearn.preprocessing import Imputer
+
+
+
+#  def marketCycle(df,mcpricevariable,mcdp,mcup,mudLogic)
+#  Market Cycle. Returns two Data Frames
+#    inputs:  df :=  data frame with market returns,
+#                    indexed by date in Y-M-D format
+#    returns: dfmc := market cycle (e.g., bull bear) detailed DataFrame with additional columns describing the
+#                        mcprice_varible :=  for S&P500 this will be "Close"
+#                        mkt             :=  1 up market, -1 down market
+#                        mchlm           :=  market cycle high/low marker  ... 1 for high mark, 0 for low mark
+#                        newhlm          :=  market new high or new low marker, 1 or 0, respectively
+#                        sdm             :=  market switch detection point
+#                        mcupm           :=  market cycle up marker, 1 for up market cycle and 0 for down market, based on sdm
+#                        mcnr            :=  market cycle normalized return
+#                        mucdown         :=  Down percent from previous high point, e.g., when mucdown hits 20% starts a bear market
+#                        mdcup           :=  Up percent from previous low point, e.g., when mdcup higs 21% start bull market
+#                        dfhlm           :=  Days from high low mark
+#                        muchp           :=  Market up high percent based on last sdm price
+#                        mdclp           :=  Market down cycle low percent based on last sdm price
+#
+#                     according to diagram below
+#             dfmcsummary := market cycle (e.g., bull bear) summary dataframe
+#                     columns := [bb,startDate,endDate,startPrice,endPrice,BullHigh,BullHighDate,BearLow,BearLowDate]
+#
+#    example:
+#           dfbb = bullBear(df)
+#
+# Dexcription
+#
+# t(index)  0  1  2  3  4  5  6  7  8  9 10  11 12 13 14  15
+#          ---bull----->|<-bear->|<--bull--->|<---bear-->|<--bull ---
+#    S&P                                     .                   .
+#                       .                 .     .             .
+#                    .     .           .         sdm       sdm
+#                 .         sdm      sdm               .   .
+#              .              .    .
+#           .                    .
+# Example
+#  description: "sdm" points are the points where the change in market
+#       is detected ("switch detected mark"), corresponding bull down
+#       20% from it's high or bear up 21% from its low. Retroactively
+#       we can know the bull high or bear low and corresponding
+#
+# Bull      1  1  1  1  1  0  0  0  1  1  1  1  0   0   0   1
+#
+# Bear      0  0  0  0  0  1  1  1  0  0  0  0  1   1   1   0
+#
+#
+# muchm      0  0  0  0  1  0  0  0  0  0  1  0  0   0   0   0
+#  bear high marker
+#
+# mdclm      0  0  0  0  0  0  1  0  0  0  0  0  0   1   0   0
+#  bear low marker
+#
+#
+# mcnr    :=  market cycle normalized return  returns.
+#             divide by price at the beginning of each market cycle
+#
+# Definitions
+# Bull Market  := Rising market. Measured from the lowest close
+#     after the market has fallen 20% or more to the next high
+#
+# Bear Market  := Declining market. Is defined as the market
+#     closing 20% down from it's previous high. It's duration
+#     is the period from the previous high to the lowest close after
+#     it has fallen 20% or more.
+#
+# Bear market begins when down 20% from Bull High
+# Bull market begins when up 21% from bear low
+
+#bullbear will receives data frame with market returns
+# applies the bullBearLogic and returns Bull Bear Data frame
+# dfbb := [date, S&P, bull, bear, switch, normBBRet ]
+
+def marketCycle(df,initMarket,mcpricevariable,mcdp,mcup,mudLogic):
+
+    #initialize state variables
+    initialMarket=initMarket
+
+    n = 0
+
+
+    if initialMarket == 1:
+        muc = 1
+        mdc = 0
+        mcupm = 1
+
+    elif initialMarket == -1:
+        muc = 0
+        mdc = 1
+        mcupm = 0
+
+
+    mkt = initialMarket
+
+
+    # initialize data frames
+    #  dfmc details
+    #  dfmc summary
+
+    dfmc = df.copy()
+    dfmc = dfmc.reindex(columns=[mcpricevariable, 'mkt','mchlm', 'newmhlm', 'sdm', 'mcupm', 'mcnr','mucdown','mdcup','mcudthr'])
+    dfmc.loc[df.index[0],['mkt','mchlm','sdm']] = [mkt,0,0]
+
+    # mchlm := market cycle high low marker
+    # newmlm := new market low marker
+    # newmhm := new market high marker
+
+    index=dfmc.index[0]
+    #print("index = ",index)
+
+    dfmcsummary = pd.DataFrame({'mkt': [], 'startTime': [], 'endTime': [], 'startPrice': [], 'endPrice': [], 'mcnr': []}, index=[])
+
+    # loop through each day of df (data frame with market S&P)
+
+
+    # Initialize Variables
+
+
+    mdclp = 0
+    mdclowtime = df.index[0]
+    mdchigh = df.iloc[0,0]
+    mdchightime=0
+    muclow = float(df.iloc[0,0])
+    muclowtime = 0
+    muchp=0
+    muchightime = 0
+    switch = 0
+    lswp = float(df.iloc[0,0])
+
+
+    h1Price = dfmc.loc[dfmc.index[0],mcpricevariable]
+    h2Price = h1Price
+    mdclow = float(dfmc.loc[dfmc.index[0],mcpricevariable])
+    muchigh = float(dfmc.loc[dfmc.index[0],mcpricevariable])
+    mucdown2=0
+    mdcup2=0
+    dfhlm = -1
+
+    newhlm=0
+
+    #lastEndTime=df.index[0]
+    #lastEndPrice=df.iloc[0,0]
+
+    lastEndTime = dfmc.index[0]
+    lastEndPrice = dfmc.loc[dfmc.index[0]]
+
+
+    st = dfmc.index[0]
+    et = dfmc.index[0]
+
+    #print("initialMarket =", initialMarket, 'muc = ', muc)
+
+    #dfmc.loc[dfmc.index[0], 'mchlm'] = 1
+    #print(dfmc.index[0],dfmc.loc[dfmc.index[0], 'mchlm'])
+
+    lastMarket = initialMarket
+    first_switch=0
+    for i in dfmc.index:
+        date = df.ix[i].name
+        date = i
+        price = df.ix[i, 0]
+
+
+
+        (n, mcupm, mcudthr,newmhlm, lswp, muc,  mucdown, mucdown2, muclow, muclowtime, muchp, muchigh, muchightime, mdc, mdcup, mdcup2, mdclp, mdclow, mdclowtime, mdchigh,
+                    mdchightime, switch, mkt, st, et, sp, ep) =  \
+                     marketCycleLogic(price,h1Price,h2Price, date, n, mcupm, lswp, mcdp,mcup, mudLogic,
+                    muc, mucdown2, muclow, muclowtime, muchp, muchigh, muchightime, mdc, mdcup2, mdclp, mdclow,
+                    mdclowtime, mdchigh, mdchightime)
+
+
+
+
+        #print('i = ',i , 'v =', price, "mcupm = ",mcupm, 'mkt = ',mkt, 'muchigh =',muchigh,'mdclow =',mdclow, 'st =',st,'et',et,'sp',sp,'ep',ep )
+        #print('  mucdown =',mucdown, 'mdcup =', mdcup )
+
+        if newmhlm == 1:
+            dfhlm = -1
+        dfhlm += 1
+
+
+        #if first_switch == 0:
+        #    if mdc ==1:
+        #        muchigh=mdclow
+        #        muchightime=mdclowtime
+        #    elif muc ==1:
+        #        mdclow=muchigh
+        #        mdclowtime=muchightime
+
+
+
+        dfmc.loc[i,'newmhlm']=newmhlm
+        dfmc.loc[i, 'mcudthr'] = mcudthr
+        dfmc.loc[i,'muchp']=muchp
+        dfmc.loc[i,'mdclp']=mdclp
+        dfmc.loc[i,'mucdown']= mucdown
+        dfmc.loc[i,'mdcup']=mdcup
+        dfmc.loc[i, 'mcupm'] = mcupm
+        if dfhlm >= 100:
+            dfmc.loc[i, 'dfhlm'] = 10
+        else:
+            dfmc.loc[i, 'dfhlm'] = dfhlm / 10
+
+        # fill in dfmcsummary info
+        if switch == 1:
+
+            d = {'mkt': [lastMarket],'startTime': [st], 'endTime': [et], 'startPrice': [sp], 'endPrice': [ep] }
+            lastMarket = -1*lastMarket
+            #print('   **** SWITCH ***', d)
+            dftmp = pd.DataFrame(d, index=[st])
+            lastEndTime = et
+            lastEndPrice = ep
+            dfmcsummary = dfmcsummary.append(dftmp)
+            dfmc.loc[st, 'mchlm'] = 1
+            dfmc.loc[et, 'mchlm'] = 1
+
+        # fill in dfmc with
+        #    sdm   - switch detection marker
+        #    mchlm - market cycle high low mark
+        dfmc.loc[i,'sdm'] = switch
+
+
+        if pd.isnull(dfmc.loc[i,'mchlm']):
+            dfmc.loc[i, 'mchlm']=0
+
+
+        h2Price = h1Price
+        h1Price = dfmc.loc[i,mcpricevariable]
+
+
+    #print(df mcsummary)
+
+    # After the loop is complete, in most cases there will not be a switch detected at the end time,
+    #   thus the tail end of the market will not be represented in the summary
+    #   so, update dfmcsummary with the latest data ... include startTime, startPrice, endTime, endPrice
+    if switch == 0:
+        if muc == 1:
+            mkt = 1
+        else:
+            mkt = -1
+        d = {'mkt': [mkt],'startTime': [lastEndTime], 'endTime': [date], 'startPrice': [lastEndPrice], 'endPrice': [ dfmc.loc[dfmc.index[dfmc.index.size-1], mcpricevariable] ] }
+        dftmp = pd.DataFrame(d, index = [lastEndTime])
+
+        dfmcsummary = dfmcsummary.append(dftmp)
+
+    # At this point the only dfmc columns with data are
+    #   S&P and sdm (switch detection point)
+    #   from these all other entries can be determined
+    #   fill in the remainder
+    if initialMarket == 1:
+        lastMkt = 1
+    elif initialMarket == -1:
+        lastMkt = -1
+    #dfmc.loc[dfmc.index[0], ['mkt']] = lastMkt
+    mcStartPrice = float(dfmc.loc[dfmc.index[0], mcpricevariable])
+
+    lastMkt = initialMarket
+    for i in dfmc.index:
+        dfmc.loc[i,'mkt'] = lastMkt
+
+        mcnr=float(dfmc.loc[i, mcpricevariable]) / mcStartPrice - 1
+        dfmc.loc[i,['mcnr']] = mcnr
+        #
+        #print(i, lastMkt,dfmc.loc[i,'mchlm'] )
+        if dfmc.loc[i,'mchlm'] == 1 and lastMkt == 1:
+            #     sprint(i)
+            if i != dfmc.index[0]:
+                lastMkt = -1
+            mcStartPrice = float(dfmc.loc[i,mcpricevariable])
+            #print(lastMkt)
+        elif dfmc.loc[i,'mchlm'] == 1 and lastMkt == -1:
+            #print(i)
+            if i != dfmc.index[0]:
+                lastMkt = 1
+            mcStartPrice = float(dfmc.loc[i,mcpricevariable])
+            #print(lastMkt)
+
+    # Add normalized Returns to dfmcsummary
+    for i in dfmcsummary.index:
+        dfmcsummary.loc[i, ['mcnr']] = dfmc.loc[dfmcsummary.loc[i,'endTime'], 'mcnr']
+
+    return (dfmc, dfmcsummary)
+
+
+#################################################################
+#  Market Cycle Logic
+#
+
+def marketCycleLogic(price,h1Price,h2Price,date,n,mcupm,lswp,mcdp,mcup,mudLogic,muc,mucdown2,muclow,muclowtime,muchp,muchigh,muchightime,mdc,mdcup2,mdclp,mdclow,mdclowtime,mdchigh,mdchightime):
+    v = float(price)
+    t = date
+    switch = 0
+    if muc ==1:
+        mkt =1
+    else:
+        mkt =-1
+    st=pd.NaT
+    et=pd.NaT
+    sp = float('nan')
+    ep = float('nan')
+
+    # mcupm := market up indicator ("buy")
+    # mdc := market down cycle (1 or 0)
+    # muc := market up cycle (1 or 0)
+    # mcudp : market cycle up/down percent
+    # mdclow := market down cycle low
+    # mdchigh := high measured from market down low while in down market
+    # muchp := market up percentage from last sdm switch point
+    # mdclp := market down percentage from last sdm switch point
+
+    newmhlm = 0
+
+    mucdown=0
+    mdcup=0
+    if muc == 1:
+        mdcup = 0
+        mdcup2 = 0
+        mucdown = (muchigh - v) / muchigh
+        muchp = v/lswp - 1  # market cycle up percentage from last low point
+        mcudthr = muchigh*(1-mcdp)
+
+    if mdc == 1:
+        mucdown = 0
+        mucdown2 = 0
+        mdcup =  (v - mdclow) / mdclow
+        mdclp = v/lswp -1   # market cycle down percentage, from last high point
+        mcudthr = mdclow*(1+mcup)
+
+#    if (n==0 ) and (muc == 1):
+#        mdclow = v
+#        mdclowtime = t
+#    if (n ==0) and (mdc == 1):
+#        muchigh = v
+#        muchightime = t
+
+    if (n==0 ):
+        mdclow = v
+        mdclowtime = t
+        muchigh = v
+        muchightime = t
+
+
+
+
+    n += 1
+
+    #print('  mdc = ',mdc,'mdclow = ',mdclow , ' muc =', muc,'muchigh =', muchigh)
+
+    if (muc == 1) and v > muchigh:
+        newmhlm = 1
+        mucdown = 0
+        mucdown2 = 0
+        muchigh = v
+        mcudthr = muchigh*(1-mcdp)
+        muchightime = t
+        muclow = v         # reset the bull low to the bull high
+        muclowtime = t
+        # print("    ",t, "up", "bullhigh = ",bullhigh, "bulllow =", bulllow, "adjclose =", v, "bullup =", bullup)
+
+    elif (muc == 1) and v < muclow:
+        mucdown2 =  (muchigh - v) / muchigh
+        mucdown = mucdown2
+        mcudthr = muchigh * (1 - mcdp)
+        if v < muclow:   # this if is not needed
+            muclow = v
+            muclowtime = t
+            # switch from up -> down
+        if mudLogic(1,mucdown,mcdp,v,mdclow,h1Price,h2Price):
+            switch = 1
+            mcudthr = mdclow * (1 + mcup)
+            newmhlm = 1
+            muc = 0
+            mdc = 1
+            mdchigh = v
+            mkt = 1
+            sp = mdclow
+            ep = muchigh
+            st = mdclowtime
+            et = muchightime
+            lswp = v
+            muchp = 0
+            mcupm = 0
+            #print("switch = ", 1, "muc to mdc", "mdclow = ", mdclow, "muchigh= ", muclow, ", price = ", v)
+            mdclow = v
+            mcudthr = mdclow * (1 + mcup)
+            mdclowtime = t
+    elif (mdc == 1) and (v < mdclow):
+        newmhlm = 1
+        mdcup=0
+        mdcup2 = 0
+        mdclow = v
+        mcudthr=mdclow*(1+mcup)
+        mkt = -1
+        mdclowtime = t
+        mdchigh = v
+        mdchightime = t
+
+    elif (mdc == 1) and (v > mdclow):   # the second part of this v > mdclow is not needed
+        mcudthr = mdclow * (1 + mcup)
+        if v > mdchigh:    # this could be moved up to the elif
+            mdcup2 = (v - mdclow) / mdclow
+            mdcup = mdcup2
+            mdchigh = v
+            mdchightime = t
+            rbrh=mdchigh
+            rbrht=mdchightime
+        #### switch from down -> up ###
+
+        if mudLogic(-1,mdcup,mcup,v,mdclow,h1Price,h2Price) :
+            # print(" bulllow = ", bulllow)
+            switch = 1
+
+            newmhlm = 1
+            muc = 1
+            mdc = 0
+            mdchigh = v
+            mdchightime = t
+            mkt = 1
+            sp = muchigh
+            ep = mdclow
+            st = muchightime
+            et = mdclowtime
+            lswp = v
+            mdclp=0
+            mcupm = 1
+            #print("switch = ", 1, "mdc to muc", "muchigh = ", muchigh, "mdclow = ", mdclow, ", price = ", v)
+            muchigh = v
+            mcudthr = muchigh * (1 - mcdp)
+            muchightime = t
+
+    return n, mcupm, mcudthr, newmhlm, lswp, muc, mucdown, mucdown2, muclow, muclowtime, muchp, muchigh, muchightime, mdc, mdcup, mdcup2, mdclp, mdclow, mdclowtime, mdchigh, mdchightime, switch, mkt, st, et, sp, ep
+
+
+def mudLogic1(mkt,mud,mudp,price,muswdp,h1Price,h2Price):
+
+    TF = False
+
+    if mud > mudp:
+        TF = True
+
+    return TF
+
+
+def mudLogic2(mkt,mud,mudp,price,muswdp,h1Price,h2Price):
+    # muswdp := market up switch detection price (price when up market to down markdt is detected)
+
+    TF = False
+
+    if mkt == 1:
+        if mud > mudp:
+            TF = True
+    if mkt == -1:
+        if mud > mudp or price > muswdp:
+            TF = True
+
+    return TF
+
+def mudLogic3(mkt,mud,mudp,price,muswdp,h1Price,h2Price):
+
+    TF = False
+
+    if mkt == 1:
+        if mud > mudp:
+            TF = True
+    if mkt == -1:
+        if mud > mudp and h1Price > h2Price:
+            TF = True
+
+    return TF
+
+def mudLogic4(mkt,mud,mudp,price,muswdp,h1Price,h2Price):
+    # muswdp := market up switch detection price (price when up market to down markdt is detected)
+
+    TF = False
+
+    if mkt == 1:
+        if mud > mudp:
+            TF = True
+    if mkt == -1:
+        if (mud > mudp or price > muswdp) and h1Price > h2Price:
+            TF = True
+
+    return TF
