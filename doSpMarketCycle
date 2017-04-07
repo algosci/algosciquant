@@ -1,0 +1,7 @@
+#!/bin/bash
+
+
+    echo "** Update SP Data"
+    ./doUpdateSPData
+
+    ./spMarketCycle.py  `date -v-2920d '+%Y-%m-%d'` `date -v-1460d '+%Y-%m-%d'` `date '+%Y-%m-%d'`
