@@ -1,5 +1,0 @@
-#!/bin/bash
-
-    ./doUpdateSPData
-
-    ./stockPred.py '^GSPC'  `date -v-400d '+%Y-%m-%d'` `date -v-10d '+%Y-%m-%d'` `date '+%Y-%m-%d'`

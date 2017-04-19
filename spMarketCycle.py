@@ -4,7 +4,6 @@
 import pandas as pd
 import argparse
 from algosciquant import *
-from marketCycle import *
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 import datetime as dt

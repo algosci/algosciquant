@@ -139,7 +139,131 @@ def getIntrinioStockData(ticker,startDate,endDate,api_username,api_password,item
     return dfh
 
 
-def ndTrendFill(dfs,price_variable,ndays):
+def ndTrendFill(dfs,price_variable,ndays,dx):
+    df=dfs
+    ndays_dt = dt.timedelta(days=ndays)
+    dfndf=pd.DataFrame(index=dfs.index)
+
+    first_i = df.index[0]
+    last_i = df.index[len(df.index)-1]
+    fi_plus_ndays = first_i + ndays_dt
+    lastindex = len(df.index)-1
+    last_i = df.index[lastindex]
+    nextindex=df.index.searchsorted(dt.datetime(fi_plus_ndays.year,fi_plus_ndays.month, fi_plus_ndays.day))
+    next_i=df.index[nextindex]
+    #print('first_i = ',first_i,'next_i = ',next_i,'last_i = ',last_i)
+    prev_i = first_i
+    previndex=0
+
+
+    x={df.loc[df.index[previndex],price_variable]}
+
+    #ndindex=pd.DataFrame(data=x, index=[df.index[previndex]])
+
+    dfnday = pd.DataFrame({price_variable:x}, index=[df.index[previndex]])
+
+
+    while next_i < last_i:
+
+        i_plus_ndays = prev_i + ndays_dt
+
+        nextindex=df.index.searchsorted(dt.datetime(i_plus_ndays.year,i_plus_ndays.month, i_plus_ndays.day))
+
+
+        if nextindex > lastindex:
+            nextindex = lastindex
+
+        #print('previndex = ', df.index[previndex], 'nextindex =', df.index[nextindex])
+
+        x = df.index[nextindex]
+
+        dftmp = pd.DataFrame({price_variable:x},index=[df.index[nextindex]])
+
+
+        dfnday=dfnday.append(dftmp)
+
+        next_i=df.index[nextindex]
+        #if (nextindex == lastindex) or (prev_i == first_i):
+        #print('prev_i = ',prev_i,'next_i = ',next_i,'t = ',t)
+        t=np.sign( df.loc[df.index[nextindex],price_variable]-df.loc[df.index[previndex],price_variable])
+        x=df.loc[df.index[nextindex],price_variable]/df.loc[df.index[previndex],price_variable] - 1
+        if x >= dx:
+            t=1
+        else:
+            t=-1
+
+        #print(next_i,last_i,nextindex,lastindex,df.index[nextindex],df.index[previndex],t)
+
+        for index in range(previndex,nextindex):
+            dfndf.loc[df.index[index],'t']=t
+        if nextindex == lastindex:
+            #print('last_price = ',df.loc[df.index[nextindex],price_variable],'prev_price = ',df.loc[df.index[previndex],price_variable] )
+            dfndf.loc[last_i] = t
+        prev_i = next_i
+        previndex = nextindex
+
+
+    return dfndf,dfnday
+
+def ndTrendSmooth(dfp,startindex,pvariable,ndays):
+    df=dfp
+    ndays_dt = dt.timedelta(days=ndays)
+
+    dfps=pd.DataFrame(index=dfp.index)
+
+    first_i = dfp.index[dfp.index.searchsorted(startindex)]
+
+    last_i = df.index[len(df.index)-1]
+    fi_plus_ndays = first_i + ndays_dt
+    lastindex = len(df.index)-1
+    last_i = df.index[lastindex]
+    nextindex=df.index.searchsorted(dt.datetime(fi_plus_ndays.year,fi_plus_ndays.month, fi_plus_ndays.day))
+    next_i=df.index[nextindex]
+    #print('first_i = ',first_i,'next_i = ',next_i,'last_i = ',last_i)
+    prev_i = first_i
+
+    previndex=dfp.index.searchsorted(startindex)
+
+    #initialize to p for first few indexes ... note, need to match up the nday intervals
+    for index in range(0,previndex):
+        dfps.loc[df.index[index],'ps']=df.loc[df.index[index],'p']
+
+    while next_i < last_i:
+        i_plus_ndays = prev_i + ndays_dt
+        nextindex=df.index.searchsorted(dt.datetime(i_plus_ndays.year,i_plus_ndays.month, i_plus_ndays.day))
+        if nextindex > lastindex:
+            nextindex = lastindex
+        next_i=df.index[nextindex]
+
+        #print('previndex = ',df.index[previndex],'nextindex =', df.index[nextindex])
+        ps_sum=0
+        for index in range(previndex,nextindex):
+
+            tmp = df.loc[df.index[index],pvariable]
+
+            ps_sum += tmp if pd.notnull(tmp) else ps_sum
+
+
+            ps = 1 if  ps_sum > 0 else -1
+
+
+
+
+            dfps.loc[df.index[index], 'ps'] = ps
+
+            #print('   ', df.loc[df.index[index],'t'], df.loc[df.index[index],'p'] , dfps.loc[df.index[index],'ps'],ps_sum )
+
+
+        if nextindex == lastindex:
+            #print('last_price = ',df.loc[df.index[nextindex],price_variable],'prev_price = ',df.loc[df.index[previndex],price_variable] )
+            dfps.loc[last_i] = np.sign(ps)
+
+        prev_i = next_i
+        previndex = nextindex
+    return dfps
+
+
+def ndTrendFill2(dfs,price_variable,ndays):
     df=dfs
     ndays_dt = dt.timedelta(days=ndays)
     dfndf=pd.DataFrame(index=dfs.index)
@@ -321,8 +445,14 @@ def mlHistoryFeatures(dfstk,dfsp,mlFeatures=['adj_close_pricer', 'adj_volumer', 
         if 'sp_close_pricer' in mlFeatures:
             dfML['sp_close_pricer'] = dfsp['close_price'] / dfsp['close_price'].shift(1) - 1
 
+        if 'sp_close_price' in mlFeatures:
+            dfML['sp_close_price'] = dfsp['close_price']
+
         if 'sp_volumer' in mlFeatures:
             dfML['sp_volumer'] = dfsp['volume'] / dfsp['volume'].shift(1) - 1
+
+        if 'sp_volume' in mlFeatures:
+            dfML['sp_volume'] = dfsp['volume']
 
         if 'adj_close_pricer' in mlFeatures:
             dfML['adj_close_pricer'] = (dfstk['adj_close_price']) / dfstk['adj_close_price'].shift(1) - 1
@@ -414,7 +544,7 @@ def backTest(dft,price_variable,start_date,end_date):
 
     return dftsummary, dfreturns
 
-def mClfTrainTest(X, Y, train_st, test_st, test_et, clf, trainndays = -1,mc=0,dftflag=pd.DataFrame()):
+def mClfTrainTest(X, Y, train_st, test_st, test_et, clf, trainndays = -1,mc=0,dftflag=pd.DataFrame(),v=1):
     import sys
     year = train_st.year
     month = train_st.month
@@ -475,9 +605,12 @@ def mClfTrainTest(X, Y, train_st, test_st, test_et, clf, trainndays = -1,mc=0,df
         dfTR.loc[i, 'train_et'] = train_et
 
 
-        #if i.year != year or i.month != month:
-        if i.year != year:
-            print (i.strftime('%Y-%m-%d'))
+        if v==1:
+            if i.year != year:
+                print (i.strftime('%Y-%m-%d'))
+        elif v==2:
+            if i.year != year or i.month != month:
+                print (i.strftime('%Y-%m-%d'))
 
             # next loop variables
         year = i.year
