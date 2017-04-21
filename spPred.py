@@ -69,6 +69,14 @@ print("\ndftruth columns")
 print(dftruth.columns)
 print(dftruth.tail(5))
 
+ndays_dt = dt.timedelta(days=ndtrend)
+plus_ndays = dfnday.index[len(dfnday.index)-2] + ndays_dt
+current_cycle_startday_str=str(dfnday.index[len(dfnday.index)-2].year)+'-'+str(dfnday.index[len(dfnday.index)-2].month)+'-'+str(dfnday.index[len(dfnday.index)-2].day)
+
+pndays_str=str(plus_ndays.year)+'-'+str(plus_ndays.month)+'-'+str(plus_ndays.day)
+
+print('\ncurrent', ndtrend,'cylce start day = ',current_cycle_startday_str)
+print('next', ndtrend,'cylce start day = ',pndays_str)
 
 ### ML Features
 
@@ -181,6 +189,9 @@ print(dftsummary)
 print("")
 print(dfreturns[[ 'nyear',  'Rc','Ra','Rc_strat','Ra_strat']])
 
+
+print('\ncurrent', ndtrend,'cylce start day = ',current_cycle_startday_str)
+print('next', ndtrend,'cylce start day = ',pndays_str)
 
 # Save to File
 #dftsummary[['start_date','end_date','start_'+price_variable,'end_'+price_variable, 'start_'+price_variable+'_SP','end_'+price_variable+'_SP' ,'return','return_SP']].to_csv(outputFilename,mode = 'a')

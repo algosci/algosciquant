@@ -145,7 +145,6 @@ def ndTrendFill(dfs,price_variable,ndays,dx):
     dfndf=pd.DataFrame(index=dfs.index)
 
     first_i = df.index[0]
-    last_i = df.index[len(df.index)-1]
     fi_plus_ndays = first_i + ndays_dt
     lastindex = len(df.index)-1
     last_i = df.index[lastindex]
@@ -155,20 +154,15 @@ def ndTrendFill(dfs,price_variable,ndays,dx):
     prev_i = first_i
     previndex=0
 
-
     x={df.loc[df.index[previndex],price_variable]}
 
     #ndindex=pd.DataFrame(data=x, index=[df.index[previndex]])
-
     dfnday = pd.DataFrame({price_variable:x}, index=[df.index[previndex]])
-
 
     while next_i < last_i:
 
         i_plus_ndays = prev_i + ndays_dt
-
         nextindex=df.index.searchsorted(dt.datetime(i_plus_ndays.year,i_plus_ndays.month, i_plus_ndays.day))
-
 
         if nextindex > lastindex:
             nextindex = lastindex
@@ -176,9 +170,7 @@ def ndTrendFill(dfs,price_variable,ndays,dx):
         #print('previndex = ', df.index[previndex], 'nextindex =', df.index[nextindex])
 
         x = df.index[nextindex]
-
         dftmp = pd.DataFrame({price_variable:x},index=[df.index[nextindex]])
-
 
         dfnday=dfnday.append(dftmp)
 

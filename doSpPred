@@ -1,6 +1,6 @@
 #!/bin/bash
 
-    ./doUpdateSpData
+    #./doUpdateSpData
 
     filename="sp_pred_summary_`date '+%Y-%m-%d'`.out"
     ./spPred.py  `date -v-2000d '+%Y-%m-%d'` `date -v-90d '+%Y-%m-%d'` `date '+%Y-%m-%d'` | tee $filename
