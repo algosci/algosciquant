@@ -114,21 +114,13 @@ print(X.columns)
 print('Y columns')
 print(Y.columns)
 
-
-ne=366
-v=2
-ntraindays = 1000
-model="RF"
-clf = RandomForestClassifier(n_estimators=ne, random_state=2)
-mc=0
-dftflag=pd.DataFrame()
+model='RF'
 
 print('ticker =',ticker)
 print('ndtrend = ',ndtrend)
 print('test start date =',test_st)
-print('ntraindays = ',ntraindays)
-print('model = ',model)
-dfTR,clf = mClfTrainTest(X,Y,train_st,test_st,test_et,clf,ntraindays,mc=mc,dftflag=dftflag,v=v)
+
+dfTR,clf = mClfTrainTest(X,Y,train_st,test_st,test_et,model)
 
 ### Smooth Predictions
 

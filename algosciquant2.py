@@ -175,7 +175,9 @@ def dftn_from_files(sdate,edate,files,price_variable,lnames):
             dftn_i0 = dftn.index[0]
             dftn.rename(columns={price_variable:lnames[k]},inplace=True)
         else:
+            #print(files[k])
             df=pd.read_csv(files[k],index_col=0,parse_dates=True)
+            #print(df.columns)
             dftn[lnames[k]]=df.loc[sdate:edate,price_variable+'_SP']/df.loc[dftn_i0,price_variable+'_SP']
         lnlist.append(lnames[k])
         k+=1
@@ -438,21 +440,39 @@ def volatilityPrice(dfTR,vol='50',ma='120',variable=''):
 
     return dfTR2
 
-def volatilityPriceSP(dfTR,vol='50',ma='120',variable=''):
+def volatilityPriceSP(dfTR,vlty='120',ma='60',mcvariable='',vlty_thr=0.2):
+
     dfTR2=dfTR.copy()
-    def fpv120(row):
-        return row['p_1'] if row['vol_y_'+vol] > 0.2 and row['close_pricer_ma'+ma] < 0 else 1
 
-    def fv120(row):
-        return -1 if row['vol_y_'+vol] > 0.2 and row['close_pricer_ma'+ma] < 0 else 1
+    def fmcpv(row):
+        return row['p_1'] if row['vol_y_' + vlty] > vlty_thr and row['close_pricer_ma' + ma] < 0 else row['mc2']
 
+    def fmcv(row):
+        return -1 if row['vol_y_' + vlty] > vlty_thr and row['close_pricer_ma' + ma] < 0 else row['mc2']
 
-    dfTR2['pv_1'] = dfTR2.apply(fpv120, axis=1)
-    dfTR2['v_1'] = dfTR2.apply(fv120, axis=1)
+    def fpv(row):
+        return row['p_1'] if row['vol_y_'+ vlty] > vlty_thr and row['close_pricer_ma'+ma] < 0 else 1
+
+    def fv(row):
+        return -1 if row['vol_y_'+ vlty] > vlty_thr and row['close_pricer_ma'+ma] < 0 else 1
+
+    def fp(row):
+        return row['p_1'] if row[mcvariable] < 1 else 1
+
+    if mcvariable:
+        dfTR2['mc2'] = dfTR[mcvariable].shift(-1)
+        dfTR2[mcvariable+'v_1'] = dfTR2.apply(fmcv, axis=1)
+        dfTR2[mcvariable + 'pv_1'] = dfTR2.apply(fmcpv, axis=1)
+        dfTR2[mcvariable + 'p_1'] = dfTR2.apply(fmcpv, axis=1)
+    dfTR2['pv_1'] = dfTR2.apply(fpv, axis=1)
+    dfTR2['v_1'] = dfTR2.apply(fv, axis=1)
     dfTR2['pv'] = dfTR2['pv_1'].shift(1)
     dfTR2['v'] = dfTR2['v_1'].shift(1)
+    dfTR2[mcvariable+'v'] = dfTR2[mcvariable+'v_1'].shift(1)
+    dfTR2[mcvariable + 'pv'] = dfTR2[mcvariable + 'pv_1'].shift(1)
+    dfTR2[mcvariable + 'p'] = dfTR2[mcvariable + 'p_1'].shift(1)
+    del dfTR2['mc2']
 
-    dfTR2[['vol_y_120', 'p', 'pv', 'v']].tail(5)
     return dfTR2
 
 #################################################################

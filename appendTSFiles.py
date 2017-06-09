@@ -25,9 +25,8 @@ df4 = grouped.last()
 # df4.fillna(df4.mean(),inplace=True)
 df4.fillna(method='pad', inplace=True)
 print("")
-print(args.outputFile,"tail(5)")
+#print(args.outputFile,"tail(5)")
 print(df4.tail(5))
-
 
 df4.to_csv(args.outputFile)
 
