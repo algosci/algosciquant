@@ -14,7 +14,8 @@ args = parser.parse_args()
 
 print(args.ticker,args.startDate,args.endDate)
 
-
+print(args.startDate)
+print(args.endDate)
 dfstock=getGoogleStockData(args.ticker,args.startDate,args.endDate,v=1)
 
 if args.outputFile == 'abc':

@@ -1,8 +1,8 @@
 # Quant Functions
 
 import pandas as pd
+import pandas_datareader as web
 import numpy as np
-import pandas_datareader.data as web
 import scipy
 from datetime import datetime
 from sklearn.preprocessing import Imputer
@@ -13,8 +13,11 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn import svm
 from sklearn.linear_model import LogisticRegression
-#from xgboost.sklearn import XGBClassifier
+from xgboost.sklearn import XGBClassifier
 from sklearn.neighbors import KNeighborsClassifier
+
+import scipy
+from datetime import datetime
 
 def getGoogleStockData(ticker,startDate,endDate,v=0):
     import sys
@@ -28,7 +31,7 @@ def getGoogleStockData(ticker,startDate,endDate,v=0):
 
 
     except:
-        print('Exception: Double check your ticker, startDate and endDate and make sure there is data available.')
+        print('Exception: check your ticker, startDate and endDate and make sure there is data available.')
         print('ticker = ', ticker)
         print('startDate = ', startDate)
         print('endDate =', endDate)
@@ -36,6 +39,7 @@ def getGoogleStockData(ticker,startDate,endDate,v=0):
         print(e)
 
     return dfs
+
 
 def getYahooStockData(ticker,startDate,endDate,v = 0):
     import yahoo_finance
@@ -56,6 +60,7 @@ def getYahooStockData(ticker,startDate,endDate,v = 0):
         print('endDate =',endDate)
         e = sys.exc_info()[0]
         print(e)
+
 
     dfs.fillna(method='pad', inplace=True)
 
