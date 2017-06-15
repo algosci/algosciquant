@@ -1,5 +1,8 @@
 #!/bin/bash
 
+
+mv ~/Downloads/\^GSPC.csv gspc.csv
+
 ####     backup the previous SP data file     ####
     echo "... backup sp500.csv to ./stock_data/sp500backup_$DATE.csv"
     cp sp500.csv ./stock_data/sp500backup_$DATE.csv

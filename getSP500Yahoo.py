@@ -1,6 +1,5 @@
 #!/Library/Frameworks/Python.framework/Versions/3.5/bin/python3
 
-import yahoo_finance
 import pandas as pd
 import argparse
 
@@ -24,7 +23,6 @@ df2=df1[['Close', 'High', 'Low', 'Open','Volume']].values
 
 
 dfsp=pd.DataFrame(df2, index=dates, columns = ['Close','High','Low','Open','Volume'])
-
 dfsp.sort_index(ascending=True,inplace=True)
 
 print(dfsp.head(5))

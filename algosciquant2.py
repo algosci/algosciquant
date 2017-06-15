@@ -19,6 +19,37 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import Imputer
 
 
+def getYahooStockData(ticker,startDate,endDate,v = 0):
+    import yahoo_finance
+    symbol = yahoo_finance.Share(ticker)
+    import sys
+
+    try:
+        stockData = symbol.get_historical(startDate,endDate)
+        df1 = pd.DataFrame(stockData)
+        dates=df1['Date'].values
+        df2=df1[['Adj_Close','Close', 'High', 'Low', 'Open', 'Volume']].values
+        dfs = pd.DataFrame(df2, index=dates, columns=['Adj_Close', 'Close', 'High', 'Low', 'Open', 'Volume'])
+        dfs.sort_index(ascending=True, inplace=True)
+    except:
+        print('Exception: Double check your ticker, startDate and endDate and make sure there is data available.')
+        print('ticker = ',ticker)
+        print('startDate = ',startDate)
+        print('endDate =',endDate)
+        e = sys.exc_info()[0]
+        print(e)
+
+
+def getSPData(startDate,endDate,v = 0):
+
+    dfsp=getYahooStockData('^GSPC',startDate,endDate,v=0)
+    del dfsp['adj_close_price']
+
+    if v > 0:
+        print(dfsp.head(5))
+
+    return dfsp
+
 
 def dftn_from_files(sdate,edate,files,price_variable,lnames):
     k=0

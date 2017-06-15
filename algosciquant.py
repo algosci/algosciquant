@@ -3,9 +3,9 @@
 import pandas as pd
 import pandas_datareader as web
 import numpy as np
-import scipy
-from datetime import datetime
-from sklearn.preprocessing import Imputer
+#import scipy
+#from datetime import datetime
+#from sklearn.preprocessing import Imputer
 
 import datetime as dt
 from sklearn.ensemble import RandomForestClassifier
@@ -16,15 +16,17 @@ from sklearn.linear_model import LogisticRegression
 from xgboost.sklearn import XGBClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
-import scipy
-from datetime import datetime
+#import matplotlib.pyplot as plt
 
-def getGoogleStockData(ticker,startDate,endDate,v=0):
+#import scipy
+#from datetime import datetime
+
+def getStockData(ticker,startDate,endDate,v=0,source='google'):
     import sys
     sDate= dt.datetime.strptime(startDate, "%Y-%m-%d")
     eDate = dt.datetime.strptime(endDate, "%Y-%m-%d")
     try:
-        dfs = web.DataReader(ticker, 'google', sDate, eDate)
+        dfs = web.DataReader(ticker, source, sDate, eDate)
         dfs.sort_index(ascending=True, inplace=True)
         dfs.rename(columns={'Close': 'adj_close_price', 'Open': 'open_price', 'High': 'high_price', 'Low': 'low_price',
                             'Volume': 'volume'}, inplace=True)
@@ -39,27 +41,6 @@ def getGoogleStockData(ticker,startDate,endDate,v=0):
         print(e)
 
     return dfs
-
-
-def getYahooStockData(ticker,startDate,endDate,v = 0):
-    import yahoo_finance
-    symbol = yahoo_finance.Share(ticker)
-    import sys
-
-    try:
-        stockData = symbol.get_historical(startDate,endDate)
-        df1 = pd.DataFrame(stockData)
-        dates=df1['Date'].values
-        df2=df1[['Adj_Close','Close', 'High', 'Low', 'Open', 'Volume']].values
-        dfs = pd.DataFrame(df2, index=dates, columns=['Adj_Close', 'Close', 'High', 'Low', 'Open', 'Volume'])
-        dfs.sort_index(ascending=True, inplace=True)
-    except:
-        print('Exception: Double check your ticker, startDate and endDate and make sure there is data available.')
-        print('ticker = ',ticker)
-        print('startDate = ',startDate)
-        print('endDate =',endDate)
-        e = sys.exc_info()[0]
-        print(e)
 
 
     dfs.fillna(method='pad', inplace=True)
@@ -81,9 +62,11 @@ def getYahooStockData(ticker,startDate,endDate,v = 0):
 
     return dfs
 
-def getYahooSPData(startDate,endDate,v = 0):
 
-    dfsp=getYahooStockData('^GSPC',startDate,endDate,v=0)
+
+def getSpData(startDate,endDate,v = 0):
+
+    dfsp=getStockData('^GSPC',startDate,endDate,v=0,source='yahoo')
     del dfsp['adj_close_price']
 
     if v > 0:
@@ -177,8 +160,8 @@ def getIntrinioStockData(ticker,startDate,endDate,api_username,api_password,item
 # Nday Truth
 
 
-
-def dftn_from_files(sdate,edate,files,price_variable,lnames):
+# Data Frame Normalized Trades from Files
+def dftnf_plot(fig,sdate,edate,files,price_variable,lnames,nsubplot=111,grid=True,loc='upper left',ncol=1):
     k=0
     lnlist=[]
     for k in range(0,len(lnames)):
@@ -195,7 +178,14 @@ def dftn_from_files(sdate,edate,files,price_variable,lnames):
         lnlist.append(lnames[k])
         k+=1
     lnames = lnlist
-    return dftn, lnames
+
+
+    f=fig.add_subplot(nsubplot)
+    for k in lnames:
+        f.plot(dftn[k],label=k)
+    f.grid(grid)
+    f.legend(loc=loc, ncol=ncol)
+    return
 
 
 def ndayTruth(df,nday,tvariable='adj_close_price'):
@@ -206,8 +196,6 @@ def ndayTruth(df,nday,tvariable='adj_close_price'):
     dfTruth['t_n'] = dfTruth['t_n'].apply(lambda x: 1 if x > 0  else -1)
     del dfTruth[tvariable+'_n']
     return dfTruth
-
-
 
 
 # Trade Returns
@@ -324,6 +312,54 @@ def clfMktConfusionMatrix(df,truth,classified):
     dfCMR=pd.DataFrame({'Predicted MktDown':[tpr,fpr],'Predicted MktUp':[fnr,tnr],'Totals': [pos, neg]}, index=['actual MktDown','actual MktUp'])
 
     return samplesize, errors, correct, er, fn, fp, tp, tn, fnr, fpr, tpr, tnr, dfCMdef, dfCMA, dfCMR
+
+def mlSpFeatures(dfsp,dfmc,mcvariable,dataStartDate,test_et):
+
+
+    dfML = pd.DataFrame(index=dfsp.index)
+
+    dfML['close_pricer'] = dfsp['close_price'] / dfsp['close_price'].shift(1) - 1
+    dfML['volumer'] = dfsp['volume'] / dfsp['volume'].shift(1) - 1
+
+    # S&P High and Low Relative to Open
+    dfML['close_price'] = dfsp.loc[dataStartDate:test_et, 'close_price']
+    dfML['sp_volume'] = dfsp.loc[dataStartDate:test_et, 'volume']
+    dfML['high_price_ropen'] = dfsp.loc[dataStartDate:test_et, 'high_price'] / dfsp['open_price'] - 1
+    dfML['low_price_ropen'] = dfsp.loc[dataStartDate:test_et, 'low_price'] / dfsp['open_price'] - 1
+
+    f2p = [2, 5, 10, 20, 30, 60, 90, 120]
+    # Historya nd MA Features
+    mlHmaFeatures = ['close_pricer', 'volumer']
+    for mlHmaFeature in mlHmaFeatures:
+        x = mlHmaFeature
+        # History, history = i
+        for i in range(1, f2p[0] + 1):
+            dfML[x + '_h' + str(i)] = dfML[x].shift(i)
+
+        # Moving averages, period=i
+        for i in f2p[1:len(f2p) + 1]:
+            period = i
+            dfML[x + '_ma' + str(i)] = (dfML[x].rolling(center=False, min_periods=period, window=period).sum() / period)
+
+    # Price Volatility
+    period = 10
+    dfML['vol_y_10'] = np.sqrt(252) * dfML['close_pricer'].rolling(center=False, min_periods=period,
+                                                                   window=period).std()
+    period = 50
+    dfML['vol_y_50'] = np.sqrt(252) * dfML['close_pricer'].rolling(center=False, min_periods=period,
+                                                                   window=period).std()
+    period = 120
+    dfML['vol_y_120'] = np.sqrt(252) * dfML['close_pricer'].rolling(center=False, min_periods=period,
+                                                                    window=period).std()
+
+    # Market Cycle ML Features
+    dfML['mc'+mcvariable] = dfmc.loc[dataStartDate:test_et, 'mcupm'].shift(1)
+    dfML['mcupm'] = dfmc.loc[dataStartDate:test_et, 'mcupm'].shift(1)
+    dfML['mcnr'] = dfmc.loc[dataStartDate:test_et, 'mcnr']
+    dfML['mucdown'] = dfmc.loc[dataStartDate:test_et, 'mucdown']
+    dfML['mdcup'] = dfmc.loc[dataStartDate:test_et, 'mdcup']
+
+    return dfML
 
 def mlStockFeatures(dfs,dfsp,dataStartDate,test_et,f=1,h=1,ma=1,v=1,sp=1):
 

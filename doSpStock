@@ -1,0 +1,8 @@
+#!/bin/bash
+
+ticker=$1
+
+  https://finance.yahoo.com/quote/%5EGSPC/history?period1=1438401600&period2=1470024000&interval=1d&filter=history&frequency=1
+
+
+cat gspc_tmp.csv | sed 's/,//g' | sed 's/2017/, 2017/' | tr '\t' ',' > gspc2.csv
